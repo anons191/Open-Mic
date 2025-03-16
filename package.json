@@ -3,17 +3,34 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@testing-library/dom": "^10.4.0",
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.2.0",
-    "@testing-library/user-event": "^13.5.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-native": "0.70.0",
+    "react-native-web": "^0.18.10",
+    "@react-navigation/native": "^6.0.0",
+    "@react-navigation/stack": "^6.0.0",
+    "axios": "^0.27.0",
+    "react-native-maps": "^0.31.1",
+    "@react-native-community/geolocation": "^2.0.2",
+    "expo-notifications": "~0.17.0",
+    "redux": "^4.2.0",
+    "react-redux": "^8.0.2",
+    "moment": "^2.29.4",
+    "lodash": "^4.17.21",
+    "react-native-vector-icons": "^9.2.0",
+    "styled-components": "^5.3.5"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/jest-dom": "^5.16.5",
     "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "eslint": "^8.23.0",
+    "prettier": "^2.7.1"
   },
   "scripts": {
     "start": "react-scripts start",
+    "web": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
