@@ -1,7 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 
-const LandingPage = () => {
+const LandingPage = ({ onLoginClick }) => {
   return (
     <Container>
       <Header>
@@ -10,7 +10,7 @@ const LandingPage = () => {
           <NavItem>Events</NavItem>
           <NavItem>Map</NavItem>
           <NavItem>Profile</NavItem>
-          <LoginButton>Login</LoginButton>
+          <LoginButton onClick={onLoginClick}>Login</LoginButton>
         </Nav>
       </Header>
       
@@ -18,9 +18,9 @@ const LandingPage = () => {
         <HeroContent>
           <HeroTitle>Find Comedy Open Mics Near You</HeroTitle>
           <HeroSubtitle>Discover events, book slots, and connect with the comedy community</HeroSubtitle>
-          <CTAButton>Find Events</CTAButton>
+          <CTAButton onClick={() => alert('This would navigate to event discovery!')}>Find Events</CTAButton>
         </HeroContent>
-        <HeroImage src="/images/mic-image.jpg" alt="Microphone on stage" />
+        <HeroImage src="/microphone.webp" alt="Microphone on stage" />
       </HeroSection>
       
       <FeaturesSection>
