@@ -6,19 +6,14 @@ const LandingPage = ({ onLoginClick }) => {
     <Container>
       <Header>
         <Logo>OpenMic</Logo>
-        <Nav>
-          <NavItem>Events</NavItem>
-          <NavItem>Map</NavItem>
-          <NavItem>Profile</NavItem>
-          <LoginButton onClick={onLoginClick}>Login</LoginButton>
-        </Nav>
+        <LoginButton onClick={onLoginClick}>Login</LoginButton>
       </Header>
       
       <HeroSection>
         <HeroContent>
           <HeroTitle>Find Comedy Open Mics Near You</HeroTitle>
           <HeroSubtitle>Discover events, book slots, and connect with the comedy community</HeroSubtitle>
-          <CTAButton onClick={() => alert('This would navigate to event discovery!')}>Find Events</CTAButton>
+          <CTAButton onClick={onLoginClick}>Get Started</CTAButton>
         </HeroContent>
         <HeroImage src="/microphone.webp" alt="Microphone on stage" />
       </HeroSection>
@@ -80,23 +75,7 @@ const Logo = styled.div`
   color: #FF5722;
 `;
 
-const Nav = styled.nav`
-  display: flex;
-  align-items: center;
-`;
-
-const NavItem = styled.a`
-  margin-left: 1.5rem;
-  color: #333;
-  cursor: pointer;
-  
-  &:hover {
-    color: #FF5722;
-  }
-`;
-
 const LoginButton = styled.button`
-  margin-left: 1.5rem;
   padding: 0.5rem 1rem;
   background-color: #FF5722;
   color: white;
