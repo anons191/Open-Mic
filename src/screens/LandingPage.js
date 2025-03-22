@@ -1,22 +1,205 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
+import { authService } from '../services/api';
 
 const LandingPage = ({ onLoginClick }) => {
+  const [showLoginForm, setShowLoginForm] = useState(false);
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('guest');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await authService.login(email, password);
+      console.log('Login successful', response);
+      // Redirect to the main app
+      onLoginClick();
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err.message || 'Invalid credentials');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegisterSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      setError(null);
+      const userData = { name, email, password, role };
+      const response = await authService.register(userData);
+      console.log('Registration successful', response);
+      // Redirect to the main app
+      onLoginClick();
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError(err.message || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleLoginForm = () => {
+    setShowLoginForm(!showLoginForm);
+    setShowRegisterForm(false);
+    setError(null);
+  };
+
+  const toggleRegisterForm = () => {
+    setShowRegisterForm(!showRegisterForm);
+    setShowLoginForm(false);
+    setError(null);
+  };
+
   return (
     <Container>
       <Header>
         <Logo>OpenMic</Logo>
-        <LoginButton onClick={onLoginClick}>Login</LoginButton>
+        <LoginButton onClick={toggleLoginForm}>Login</LoginButton>
       </Header>
       
       <HeroSection>
         <HeroContent>
           <HeroTitle>Find Comedy Open Mics Near You</HeroTitle>
           <HeroSubtitle>Discover events, book slots, and connect with the comedy community</HeroSubtitle>
-          <CTAButton onClick={onLoginClick}>Get Started</CTAButton>
+          <CTAButton onClick={toggleRegisterForm}>Get Started</CTAButton>
         </HeroContent>
         <HeroImage src="/microphone.webp" alt="Microphone on stage" />
       </HeroSection>
+
+      {showLoginForm && (
+        <FormOverlay>
+          <FormContainer>
+            <FormTitle>Login</FormTitle>
+            {error && <ErrorMessage>{error}</ErrorMessage>}
+            <Form onSubmit={handleLoginSubmit}>
+              <FormField>
+                <FormLabel>Email</FormLabel>
+                <FormInput 
+                  type="email" 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </FormField>
+              <FormField>
+                <FormLabel>Password</FormLabel>
+                <FormInput 
+                  type="password" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </FormField>
+              <FormSubmitButton type="submit" disabled={loading}>
+                {loading ? 'Logging in...' : 'Login'}
+              </FormSubmitButton>
+              <FormSwitchText>
+                Don't have an account? 
+                <FormSwitchLink onClick={toggleRegisterForm}>Sign up</FormSwitchLink>
+              </FormSwitchText>
+            </Form>
+            <FormCloseButton onClick={toggleLoginForm}>×</FormCloseButton>
+          </FormContainer>
+        </FormOverlay>
+      )}
+
+      {showRegisterForm && (
+        <FormOverlay>
+          <FormContainer>
+            <FormTitle>Create Account</FormTitle>
+            {error && <ErrorMessage>{error}</ErrorMessage>}
+            <Form onSubmit={handleRegisterSubmit}>
+              <FormField>
+                <FormLabel>Name</FormLabel>
+                <FormInput 
+                  type="text" 
+                  value={name} 
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </FormField>
+              <FormField>
+                <FormLabel>Email</FormLabel>
+                <FormInput 
+                  type="email" 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </FormField>
+              <FormField>
+                <FormLabel>Password</FormLabel>
+                <FormInput 
+                  type="password" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </FormField>
+              <FormField>
+                <FormLabel>I am a:</FormLabel>
+                <RoleRadioGroup>
+                  <RoleRadioItem>
+                    <RoleRadioInput 
+                      type="radio" 
+                      id="guest" 
+                      name="role" 
+                      value="guest"
+                      checked={role === 'guest'}
+                      onChange={() => setRole('guest')}
+                    />
+                    <RoleRadioLabel htmlFor="guest">Guest</RoleRadioLabel>
+                  </RoleRadioItem>
+                  <RoleRadioItem>
+                    <RoleRadioInput 
+                      type="radio" 
+                      id="comedian" 
+                      name="role" 
+                      value="comedian"
+                      checked={role === 'comedian'}
+                      onChange={() => setRole('comedian')}
+                    />
+                    <RoleRadioLabel htmlFor="comedian">Comedian</RoleRadioLabel>
+                  </RoleRadioItem>
+                  <RoleRadioItem>
+                    <RoleRadioInput 
+                      type="radio" 
+                      id="venue_owner" 
+                      name="role" 
+                      value="venue_owner"
+                      checked={role === 'venue_owner'}
+                      onChange={() => setRole('venue_owner')}
+                    />
+                    <RoleRadioLabel htmlFor="venue_owner">Venue Owner</RoleRadioLabel>
+                  </RoleRadioItem>
+                </RoleRadioGroup>
+                <RoleDescription>
+                  {role === 'guest' && 'Discover and attend comedy events'}
+                  {role === 'comedian' && 'Find open mics and sign up for performance slots'}
+                  {role === 'venue_owner' && 'Manage your venues and create comedy events'}
+                </RoleDescription>
+              </FormField>
+              <FormSubmitButton type="submit" disabled={loading}>
+                {loading ? 'Signing up...' : 'Sign Up'}
+              </FormSubmitButton>
+              <FormSwitchText>
+                Already have an account? 
+                <FormSwitchLink onClick={toggleLoginForm}>Login</FormSwitchLink>
+              </FormSwitchText>
+            </Form>
+            <FormCloseButton onClick={toggleRegisterForm}>×</FormCloseButton>
+          </FormContainer>
+        </FormOverlay>
+      )}
       
       <FeaturesSection>
         <SectionTitle>Why Use OpenMic?</SectionTitle>
@@ -230,6 +413,171 @@ const FooterLink = styled.a`
   &:hover {
     color: #FF5722;
   }
+`;
+
+// Form Styles
+const FormOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+`;
+
+const FormContainer = styled.div`
+  position: relative;
+  width: 90%;
+  max-width: 400px;
+  background-color: white;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+`;
+
+const FormTitle = styled.h2`
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: #212121;
+  text-align: center;
+`;
+
+const Form = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+`;
+
+const FormField = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+`;
+
+const FormLabel = styled.label`
+  font-size: 0.9rem;
+  color: #757575;
+  font-weight: 500;
+`;
+
+const FormInput = styled.input`
+  padding: 0.8rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 1rem;
+  
+  &:focus {
+    outline: none;
+    border-color: #FF5722;
+  }
+`;
+
+// New radio button role selection
+const RoleRadioGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+`;
+
+const RoleRadioItem = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+const RoleRadioInput = styled.input`
+  margin-right: 10px;
+  cursor: pointer;
+  accent-color: #FF5722;
+  width: 18px;
+  height: 18px;
+`;
+
+const RoleRadioLabel = styled.label`
+  font-size: 16px;
+  cursor: pointer;
+`;
+
+const RoleDescription = styled.div`
+  font-size: 14px;
+  color: #757575;
+  margin-top: 5px;
+  min-height: 40px;
+  padding: 8px;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+`;
+
+const FormSubmitButton = styled.button`
+  padding: 0.8rem;
+  background-color: #FF5722;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  
+  &:hover {
+    background-color: #E64A19;
+  }
+  
+  &:disabled {
+    background-color: #BDBDBD;
+    cursor: not-allowed;
+  }
+`;
+
+const FormSwitchText = styled.div`
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: #757575;
+`;
+
+const FormSwitchLink = styled.span`
+  color: #FF5722;
+  cursor: pointer;
+  margin-left: 0.5rem;
+  font-weight: 500;
+  
+  &:hover {
+    text-decoration: underline;
+  }
+`;
+
+const FormCloseButton = styled.button`
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background-color: #f5f5f5;
+  border: none;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #e0e0e0;
+  }
+`;
+
+const ErrorMessage = styled.div`
+  padding: 0.8rem;
+  background-color: #ffebee;
+  color: #c62828;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
 `;
 
 export default LandingPage;

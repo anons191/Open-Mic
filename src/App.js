@@ -1,16 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import LandingPage from './screens/LandingPage';
 import AuthNavigator from './navigation/AuthNavigator';
 import ProfileScreen from './screens/profile/ProfileScreen';
 import MapScreen from './screens/events/MapScreen';
 import EventListScreen from './screens/events/EventListScreen';
+import VenueManagementScreen from './screens/venues/VenueManagementScreen';
 import styled from 'styled-components';
+import { authService } from './services/api';
 
 function App() {
   const [view, setView] = useState('landing'); // 'landing', 'auth', 'main'
   const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'events', 'map'
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'events', 'map', 'venues'
+  const [loading, setLoading] = useState(true);
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkLoginStatus = async () => {
+      try {
+        setLoading(true);
+        const currentUser = authService.getCurrentUser();
+        
+        if (currentUser) {
+          // Verify token is still valid by getting user profile
+          try {
+            const response = await authService.getUserProfile();
+            setUser(currentUser);
+            
+            // Set initial active tab based on user role
+            if (currentUser.role === 'venue_owner') {
+              setActiveTab('venues');
+            } else {
+              setActiveTab('events');
+            }
+            
+            setView('main');
+          } catch (err) {
+            // Token expired or invalid, logout
+            console.error('User session expired', err);
+            authService.logout();
+          }
+        }
+      } catch (err) {
+        console.error('Error checking login status', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkLoginStatus();
+  }, []);
 
   const handleLoginClick = () => {
     setView('auth');
@@ -18,23 +58,43 @@ function App() {
 
   const handleAuthenticated = (userData) => {
     setUser(userData);
+    
+    // Set initial active tab based on user role
+    if (userData.role === 'venue_owner') {
+      setActiveTab('venues');
+    } else {
+      setActiveTab('events');
+    }
+    
     setView('main');
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    setUser(null);
+    setView('landing');
   };
 
   const renderMainContent = () => {
     switch (activeTab) {
       case 'profile':
-        return <ProfileScreen />;
+        return <ProfileScreen user={user} />;
       case 'events':
-        return <EventListScreen />;
+        return <EventListScreen userRole={user?.role} />;
       case 'map':
-        return <MapScreen />;
+        return <MapScreen userRole={user?.role} />;
+      case 'venues':
+        return <VenueManagementScreen user={user} />;
       default:
-        return <ProfileScreen />;
+        return <ProfileScreen user={user} />;
     }
   };
 
   const renderContent = () => {
+    if (loading) {
+      return <LoadingScreen>Loading...</LoadingScreen>;
+    }
+    
     switch (view) {
       case 'landing':
         return <LandingPage onLoginClick={handleLoginClick} />;
@@ -64,13 +124,21 @@ function App() {
                 >
                   Map
                 </NavItem>
+                {user?.role === 'venue_owner' && (
+                  <NavItem 
+                    active={activeTab === 'venues'} 
+                    onClick={() => setActiveTab('venues')}
+                  >
+                    My Venues
+                  </NavItem>
+                )}
               </HeaderNav>
-              <LogoutButton onClick={() => {
-                setUser(null);
-                setView('landing');
-              }}>
-                Log Out
-              </LogoutButton>
+              <UserInfo>
+                <UserRole>{user?.role === 'venue_owner' ? 'Venue Owner' : user?.role === 'comedian' ? 'Comedian' : 'Guest'}</UserRole>
+                <LogoutButton onClick={handleLogout}>
+                  Log Out
+                </LogoutButton>
+              </UserInfo>
             </AppHeader>
             <ContentContainer>
               {renderMainContent()}
@@ -90,6 +158,15 @@ function App() {
 }
 
 // Styled Components
+const LoadingScreen = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 1.2rem;
+  color: #757575;
+`;
+
 const MainContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -146,6 +223,29 @@ const NavItem = styled.a`
     margin: 0;
     text-align: center;
     border-bottom: none;
+    font-size: 0.8rem;
+  }
+`;
+
+const UserInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  
+  @media (max-width: 768px) {
+    gap: 0.5rem;
+  }
+`;
+
+const UserRole = styled.div`
+  font-size: 0.9rem;
+  color: #757575;
+  background-color: #f5f5f5;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  
+  @media (max-width: 768px) {
+    display: none;
   }
 `;
 
@@ -176,17 +276,6 @@ const ContentContainer = styled.main`
   @media (max-width: 768px) {
     padding-bottom: 80px;
   }
-`;
-
-const PlaceholderContent = styled.div`
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 40px 20px;
-  text-align: center;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  margin-top: 30px;
 `;
 
 export default App;

@@ -1,58 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { colors } from '../../theme/colors';
-
-// Mock data - in a real app, would come from API/Redux
-const mockVenues = [
-  {
-    id: '1',
-    name: 'Comedy Cellar',
-    address: '117 MacDougal St, New York, NY',
-    location: { lat: 40.730215, lng: -74.000144 },
-    rating: 4.8,
-    upcomingEvents: 3,
-    image: '/images/venue1.png'
-  },
-  {
-    id: '2',
-    name: 'Laugh Factory',
-    address: '8001 Sunset Blvd, Los Angeles, CA',
-    location: { lat: 34.097920, lng: -118.366470 },
-    rating: 4.5,
-    upcomingEvents: 5,
-    image: '/images/venue2.png'
-  },
-  {
-    id: '3',
-    name: 'The Stand NYC',
-    address: '116 E 16th St, New York, NY',
-    location: { lat: 40.737762, lng: -73.988127 },
-    rating: 4.6,
-    upcomingEvents: 2,
-    image: '/images/venue3.png'
-  },
-  {
-    id: '4',
-    name: 'Gotham Comedy Club',
-    address: '208 W 23rd St, New York, NY',
-    location: { lat: 40.744661, lng: -73.995282 },
-    rating: 4.7,
-    upcomingEvents: 4,
-    image: '/images/venue1.png'
-  },
-  {
-    id: '5',
-    name: 'Broadway Comedy Club',
-    address: '318 W 53rd St, New York, NY',
-    location: { lat: 40.765370, lng: -73.985470 },
-    rating: 4.2,
-    upcomingEvents: 2,
-    image: '/images/venue2.png'
-  }
-];
+import { venueService, eventService } from '../../services/api';
 
 const MapScreen = () => {
-  const [venues, setVenues] = useState(mockVenues);
+  const [venues, setVenues] = useState([]);
+  const [events, setEvents] = useState([]);
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -60,10 +13,33 @@ const MapScreen = () => {
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('any'); // 'today', 'tomorrow', 'thisWeek', 'any'
+  const [loading, setLoading] = useState(true);
   
-  // This would be a real map implementation using react-native-maps or a web map library like Google Maps API
-  // For this mockup, we'll simulate the map behavior
   useEffect(() => {
+    // Fetch venues from API
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Get venues
+        const venueResponse = await venueService.getVenues();
+        setVenues(venueResponse.data);
+        
+        // Get events
+        const eventResponse = await eventService.getEvents();
+        setEvents(eventResponse.data);
+        
+        // Simulate getting user location
+        getUserLocation();
+        
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setMapError('Failed to load venue data');
+        setLoading(false);
+      }
+    };
+    
     // Simulate getting user location
     const getUserLocation = () => {
       // In a real app, we would use navigator.geolocation or a location library
@@ -73,17 +49,23 @@ const MapScreen = () => {
       }, 1000);
     };
     
-    getUserLocation();
-    
-    return () => {
-      // Cleanup if needed
-    };
+    fetchData();
   }, []);
   
-  // Filter venues based on search query and date filter
+  // Get upcoming events for a venue
+  const getUpcomingEventsCount = (venueId) => {
+    return events.filter(event => 
+      event.venue._id === venueId && 
+      new Date(event.date) > new Date() &&
+      event.status === 'scheduled'
+    ).length;
+  };
+  
+  // Filter venues based on search query
   const filteredVenues = venues.filter(venue => {
     return venue.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           venue.address.toLowerCase().includes(searchQuery.toLowerCase());
+           venue.address.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           venue.address.state.toLowerCase().includes(searchQuery.toLowerCase());
   });
   
   const handleVenueSelect = (venue) => {
@@ -91,7 +73,7 @@ const MapScreen = () => {
   };
   
   const renderMap = () => {
-    if (!mapLoaded) {
+    if (loading || !mapLoaded) {
       return <MapLoadingContainer>Loading map...</MapLoadingContainer>;
     }
     
@@ -105,19 +87,22 @@ const MapScreen = () => {
         <MockMap>
           <UserLocationMarker />
           
-          {filteredVenues.map(venue => (
-            <VenueMarker 
-              key={venue.id}
-              active={selectedVenue?.id === venue.id}
-              onClick={() => handleVenueSelect(venue)}
-              style={{
-                top: `${Math.random() * 70 + 10}%`,
-                left: `${Math.random() * 70 + 10}%`
-              }}
-            >
-              <MarkerCount>{venue.upcomingEvents}</MarkerCount>
-            </VenueMarker>
-          ))}
+          {filteredVenues.map(venue => {
+            const upcomingEvents = getUpcomingEventsCount(venue._id);
+            return (
+              <VenueMarker 
+                key={venue._id}
+                active={selectedVenue?._id === venue._id}
+                onClick={() => handleVenueSelect(venue)}
+                style={{
+                  top: `${Math.random() * 70 + 10}%`,
+                  left: `${Math.random() * 70 + 10}%`
+                }}
+              >
+                <MarkerCount>{upcomingEvents}</MarkerCount>
+              </VenueMarker>
+            );
+          })}
           
           {selectedVenue && (
             <InfoWindow style={{
@@ -125,12 +110,14 @@ const MapScreen = () => {
               left: '50%',
               transform: 'translate(-50%, -50%)'
             }}>
-              <InfoWindowImage src={selectedVenue.image} alt={selectedVenue.name} />
+              <InfoWindowImage src={selectedVenue.image || "/images/venue1.png"} alt={selectedVenue.name} />
               <InfoWindowContent>
                 <InfoWindowTitle>{selectedVenue.name}</InfoWindowTitle>
-                <InfoWindowAddress>{selectedVenue.address}</InfoWindowAddress>
+                <InfoWindowAddress>
+                  {selectedVenue.address.street}, {selectedVenue.address.city}, {selectedVenue.address.state}
+                </InfoWindowAddress>
                 <InfoWindowRating>
-                  ★ {selectedVenue.rating} · {selectedVenue.upcomingEvents} upcoming events
+                  ★ {selectedVenue.rating || "New"} · {getUpcomingEventsCount(selectedVenue._id)} upcoming events
                 </InfoWindowRating>
                 <InfoWindowButton>View Details</InfoWindowButton>
               </InfoWindowContent>
@@ -406,7 +393,7 @@ const MockMap = styled.div`
   position: relative;
   height: 100%;
   background-color: #e8eaed;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%23c5c9d2' fill-opacity='0.4'%3E%3Cpath opacity='.5' d='M96 95h4v1h-4v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9zm-1 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm9-10v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm9-10v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm9-10v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9z'/%3E%3Cpath d='M6 5V0H5v5H0v1h5v94h1V6h94V5H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%23c5c9d2' fill-opacity='0.4'%3E%3Cpath opacity='.5' d='M96 95h4v1h-4v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9zm-1 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm9-10v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm9-10v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm9-10v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9z'/%3E%3Cpath d='M6 5V0H5v5H0v1h5v94h1V6h94V5H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 `;
 
 const UserLocationMarker = styled.div`

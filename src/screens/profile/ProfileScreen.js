@@ -1,167 +1,160 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { colors } from '../../theme/colors';
-import moment from 'moment';
+import { authService, eventService } from '../../services/api';
 
-// Mock data - in a real app, this would come from Redux/API
-const mockUser = {
-  id: '123',
-  name: 'Alex Johnson',
-  username: 'alexjcomedy',
-  bio: 'Stand-up comedian, writer, and podcast host. 5 years on the mic and still bombing occasionally.',
-  location: 'New York, NY',
-  profileImage: '/images/profile-placeholder.png',
-  joinDate: '2023-03-15'
-};
-
-const mockEvents = [
-  {
-    id: '1',
-    name: 'Comedy Cellar Open Mic',
-    venue: 'Comedy Cellar',
-    address: '117 MacDougal St, New York, NY',
-    date: '2025-03-25T19:30:00',
-    attendingAs: 'comedian',
-    signupTime: '6:00 PM',
-    performanceTime: '7:45 PM (estimated)',
-    image: '/images/venue1.png'
-  },
-  {
-    id: '2',
-    name: 'Laugh Factory Weekly Open Mic',
-    venue: 'Laugh Factory',
-    address: '8001 Sunset Blvd, Los Angeles, CA',
-    date: '2025-04-05T20:00:00',
-    attendingAs: 'guest',
-    image: '/images/venue2.png'
-  },
-  {
-    id: '3',
-    name: 'The Stand Comedy Showcase',
-    venue: 'The Stand NYC',
-    address: '116 E 16th St, New York, NY',
-    date: '2025-04-12T21:00:00',
-    attendingAs: 'comedian',
-    signupTime: '7:30 PM',
-    performanceTime: '9:15 PM (estimated)',
-    image: '/images/venue3.png'
-  }
-];
-
-const ProfileScreen = () => {
-  const [user] = useState(mockUser);
-  const [events] = useState(mockEvents);
-  const [activeTab, setActiveTab] = useState('upcoming'); // upcoming, past, saved
+const ProfileScreen = ({ user }) => {
+  const [profile, setProfile] = useState(null);
+  const [userEvents, setUserEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
-  const filteredEvents = () => {
-    const now = moment();
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        setLoading(true);
+        
+        // Get user profile
+        const profileResponse = await authService.getUserProfile();
+        setProfile(profileResponse.data);
+        
+        // Get user events (we'll implement this API endpoint later)
+        // For now, we'll fetch all events and filter client-side
+        const eventsResponse = await eventService.getEvents();
+        
+        // For demonstration, we're just showing all events
+        // In a real implementation, we'd filter for events the user has registered for
+        setUserEvents(eventsResponse.data);
+        
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching profile data:', err);
+        setError('Failed to load profile data');
+        setLoading(false);
+      }
+    };
     
-    switch (activeTab) {
-      case 'upcoming':
-        return events.filter(event => moment(event.date).isAfter(now));
-      case 'past':
-        return events.filter(event => moment(event.date).isBefore(now));
-      case 'saved':
-        // In a real app, this would filter for bookmarked/saved events
-        return [];
-      default:
-        return events;
-    }
-  };
+    fetchProfileData();
+  }, []);
+  
+  if (loading) {
+    return (
+      <LoadingContainer>
+        <LoadingText>Loading profile...</LoadingText>
+      </LoadingContainer>
+    );
+  }
+  
+  if (error) {
+    return (
+      <ErrorContainer>
+        <ErrorText>{error}</ErrorText>
+      </ErrorContainer>
+    );
+  }
+
+  const isGuest = profile?.role === 'guest' || user?.role === 'guest';
+  const isComedian = profile?.role === 'comedian' || user?.role === 'comedian';
+  const isVenueOwner = profile?.role === 'venue_owner' || user?.role === 'venue_owner';
   
   return (
     <Container>
       <ProfileHeader>
-        <ProfileImageContainer>
-          <ProfileImage src={user.profileImage} alt={user.name} />
-        </ProfileImageContainer>
+        <ProfileImage src="/images/default-avatar.png" alt="Profile" />
         <ProfileInfo>
-          <ProfileName>{user.name}</ProfileName>
-          <ProfileUsername>@{user.username}</ProfileUsername>
-          <ProfileLocation>{user.location}</ProfileLocation>
-          <ProfileJoinDate>Joined {moment(user.joinDate).format('MMMM YYYY')}</ProfileJoinDate>
+          <ProfileName>{profile?.name || user?.name || 'User'}</ProfileName>
+          <ProfileDetail>
+            <ProfileLabel>Email:</ProfileLabel>
+            <ProfileValue>{profile?.email || user?.email || 'email@example.com'}</ProfileValue>
+          </ProfileDetail>
+          <ProfileDetail>
+            <ProfileLabel>Role:</ProfileLabel>
+            <ProfileValue>
+              {isGuest && 'Comedy Fan'}
+              {isComedian && 'Comedian'}
+              {isVenueOwner && 'Venue Owner'}
+            </ProfileValue>
+          </ProfileDetail>
+          <ProfileBio>{profile?.bio || (isComedian ? 'No bio yet. Tell us about yourself as a comedian!' : 'No bio yet.')}</ProfileBio>
         </ProfileInfo>
-        <EditProfileButton>Edit Profile</EditProfileButton>
       </ProfileHeader>
-      
-      <ProfileBio>
-        <BioTitle>About</BioTitle>
-        <BioText>{user.bio}</BioText>
-      </ProfileBio>
-      
-      <EventsSection>
-        <TabsContainer>
-          <Tab 
-            active={activeTab === 'upcoming'} 
-            onClick={() => setActiveTab('upcoming')}
-          >
-            Upcoming Events
-          </Tab>
-          <Tab 
-            active={activeTab === 'past'} 
-            onClick={() => setActiveTab('past')}
-          >
-            Past Events
-          </Tab>
-          <Tab 
-            active={activeTab === 'saved'} 
-            onClick={() => setActiveTab('saved')}
-          >
-            Saved Events
-          </Tab>
-        </TabsContainer>
-        
-        <EventsList>
-          {filteredEvents().length > 0 ? (
-            filteredEvents().map(event => (
-              <EventCard key={event.id}>
-                <EventImageContainer>
-                  <EventImage src={event.image} alt={event.name} />
-                  <AttendanceType type={event.attendingAs}>
-                    {event.attendingAs === 'comedian' ? 'Performing' : 'Attending'}
-                  </AttendanceType>
-                </EventImageContainer>
-                <EventDetails>
-                  <EventName>{event.name}</EventName>
-                  <EventVenue>{event.venue}</EventVenue>
-                  <EventAddress>{event.address}</EventAddress>
-                  <EventDate>
-                    {moment(event.date).format('dddd, MMMM D, YYYY • h:mm A')}
-                  </EventDate>
-                  
-                  {event.attendingAs === 'comedian' && (
-                    <PerformanceDetails>
-                      <DetailItem>
-                        <DetailLabel>Sign-up Time:</DetailLabel>
-                        <DetailValue>{event.signupTime}</DetailValue>
-                      </DetailItem>
-                      <DetailItem>
-                        <DetailLabel>Performance Time:</DetailLabel>
-                        <DetailValue>{event.performanceTime}</DetailValue>
-                      </DetailItem>
-                    </PerformanceDetails>
-                  )}
-                  
-                  <EventActions>
-                    <ActionButton primary>View Details</ActionButton>
-                    {event.attendingAs === 'comedian' ? (
-                      <ActionButton>Edit Set</ActionButton>
-                    ) : (
-                      <ActionButton>RSVP</ActionButton>
-                    )}
-                  </EventActions>
-                </EventDetails>
-              </EventCard>
-            ))
+
+      <ProfileContent>
+        <Section>
+          {isGuest && <SectionTitle>Shows You're Attending</SectionTitle>}
+          {isComedian && <SectionTitle>Your Upcoming Performances</SectionTitle>}
+          {isVenueOwner && <SectionTitle>Your Venue Events</SectionTitle>}
+          
+          {userEvents.length > 0 ? (
+            <EventsList>
+              {userEvents.map(event => (
+                <EventCard key={event._id}>
+                  <EventImage src={event.image || "/images/venue1.png"} alt={event.name} />
+                  <EventInfo>
+                    <EventName>{event.name}</EventName>
+                    <EventVenue>at {event.venue?.name}</EventVenue>
+                    <EventDetail>
+                      <EventLabel>Date:</EventLabel>
+                      <EventValue>{new Date(event.date).toLocaleDateString()}</EventValue>
+                    </EventDetail>
+                    <EventDetail>
+                      <EventLabel>Time:</EventLabel>
+                      <EventValue>{event.startTime} - {event.endTime}</EventValue>
+                    </EventDetail>
+                    <EventActions>
+                      <EventButton primary>View Details</EventButton>
+                      {isGuest && <EventButton>Cancel RSVP</EventButton>}
+                      {isComedian && <EventButton>Cancel Performance</EventButton>}
+                    </EventActions>
+                  </EventInfo>
+                </EventCard>
+              ))}
+            </EventsList>
           ) : (
-            <NoEventsMessage>
-              {activeTab === 'upcoming' && "You don't have any upcoming events."}
-              {activeTab === 'past' && "You don't have any past events."}
-              {activeTab === 'saved' && "You don't have any saved events."}
-            </NoEventsMessage>
+            <EmptyState>
+              {isGuest && 'You haven\'t registered for any shows yet.'}
+              {isComedian && 'You haven\'t signed up for any performances yet.'}
+              {isVenueOwner && 'You don\'t have any events scheduled yet.'}
+              <EmptyStateAction>Find Open Mics</EmptyStateAction>
+            </EmptyState>
           )}
-        </EventsList>
-      </EventsSection>
+        </Section>
+
+        <Section>
+          <SectionTitle>Edit Profile</SectionTitle>
+          <ProfileForm>
+            <FormField>
+              <FormLabel>Bio</FormLabel>
+              <FormTextArea 
+                placeholder={isComedian 
+                  ? "Tell us about yourself as a comedian..." 
+                  : "Tell us about yourself..."}
+                value={profile?.bio || ''}
+                readOnly
+              />
+            </FormField>
+            
+            {isComedian && (
+              <FormField>
+                <FormLabel>Comedy Style</FormLabel>
+                <FormSelect readOnly>
+                  <option>Observational</option>
+                  <option>Dark</option>
+                  <option>Absurdist</option>
+                  <option>One-liner</option>
+                  <option>Improv</option>
+                  <option>Other</option>
+                </FormSelect>
+              </FormField>
+            )}
+            
+            <FormButton disabled>Update Profile</FormButton>
+            <FormNote>
+              * Profile editing will be enabled in a future update
+            </FormNote>
+          </ProfileForm>
+        </Section>
+      </ProfileContent>
     </Container>
   );
 };
@@ -173,252 +166,300 @@ const Container = styled.div`
   padding: 20px;
 `;
 
-const ProfileHeader = styled.div`
+const LoadingContainer = styled.div`
   display: flex;
+  justify-content: center;
   align-items: center;
-  margin-bottom: 30px;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    text-align: center;
-  }
+  height: 400px;
 `;
 
-const ProfileImageContainer = styled.div`
-  margin-right: 30px;
-  
-  @media (max-width: 768px) {
-    margin-right: 0;
-    margin-bottom: 20px;
-  }
-`;
-
-const ProfileImage = styled.img`
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid ${colors.primary || '#FF5722'};
-`;
-
-const ProfileInfo = styled.div`
-  flex: 1;
-`;
-
-const ProfileName = styled.h1`
-  font-size: 24px;
-  margin: 0 0 5px 0;
-`;
-
-const ProfileUsername = styled.div`
-  font-size: 16px;
-  color: #757575;
-  margin-bottom: 5px;
-`;
-
-const ProfileLocation = styled.div`
-  font-size: 14px;
-  margin-bottom: 5px;
-`;
-
-const ProfileJoinDate = styled.div`
-  font-size: 14px;
-  color: #757575;
-`;
-
-const EditProfileButton = styled.button`
-  padding: 10px 20px;
-  background-color: white;
-  color: ${colors.primary || '#FF5722'};
-  border: 1px solid ${colors.primary || '#FF5722'};
-  border-radius: 4px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  
-  &:hover {
-    background-color: ${colors.primaryLight || '#FFCCBC'};
-  }
-  
-  @media (max-width: 768px) {
-    margin-top: 20px;
-  }
-`;
-
-const ProfileBio = styled.div`
-  margin-bottom: 30px;
-  padding: 20px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-`;
-
-const BioTitle = styled.h2`
+const LoadingText = styled.div`
   font-size: 18px;
-  margin: 0 0 10px 0;
+  color: #757575;
 `;
 
-const BioText = styled.p`
-  font-size: 16px;
-  line-height: 1.5;
-  margin: 0;
-`;
-
-const EventsSection = styled.div`
-  margin-top: 40px;
-`;
-
-const TabsContainer = styled.div`
+const ErrorContainer = styled.div`
   display: flex;
-  border-bottom: 1px solid #e0e0e0;
-  margin-bottom: 20px;
-  
-  @media (max-width: 768px) {
-    overflow-x: auto;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-  }
+  justify-content: center;
+  align-items: center;
+  height: 400px;
 `;
 
-const Tab = styled.div`
-  padding: 12px 20px;
-  cursor: pointer;
-  font-weight: ${props => props.active ? '600' : '400'};
-  color: ${props => props.active ? colors.primary || '#FF5722' : '#757575'};
-  border-bottom: ${props => props.active ? `2px solid ${colors.primary || '#FF5722'}` : '2px solid transparent'};
-  
-  &:hover {
-    color: ${colors.primary || '#FF5722'};
-  }
+const ErrorText = styled.div`
+  font-size: 18px;
+  color: #D32F2F;
+  background-color: #FFEBEE;
+  padding: 16px;
+  border-radius: 8px;
+  text-align: center;
 `;
 
-const EventsList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-`;
-
-const EventCard = styled.div`
+const ProfileHeader = styled.div`
   display: flex;
   background-color: white;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
   
   @media (max-width: 768px) {
     flex-direction: column;
   }
 `;
 
-const EventImageContainer = styled.div`
-  position: relative;
-  width: 200px;
+const ProfileImage = styled.img`
+  width: 150px;
+  height: 150px;
+  object-fit: cover;
   
   @media (max-width: 768px) {
     width: 100%;
-    height: 150px;
+    height: 200px;
   }
 `;
 
-const EventImage = styled.img`
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-`;
-
-const AttendanceType = styled.div`
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  padding: 5px 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: bold;
-  background-color: ${props => props.type === 'comedian' ? '#FF5722' : '#4CAF50'};
-  color: white;
-`;
-
-const EventDetails = styled.div`
+const ProfileInfo = styled.div`
   flex: 1;
   padding: 20px;
 `;
 
-const EventName = styled.h3`
+const ProfileName = styled.h2`
+  margin: 0 0 16px 0;
+  color: #212121;
+  font-size: 24px;
+`;
+
+const ProfileDetail = styled.div`
+  display: flex;
+  margin-bottom: 8px;
+`;
+
+const ProfileLabel = styled.div`
+  font-weight: 600;
+  width: 80px;
+  color: #757575;
+`;
+
+const ProfileValue = styled.div`
+  flex: 1;
+`;
+
+const ProfileBio = styled.p`
+  margin-top: 16px;
+  line-height: 1.5;
+  color: #424242;
+`;
+
+const ProfileContent = styled.div`
+  display: flex;
+  gap: 20px;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+`;
+
+const Section = styled.div`
+  flex: 1;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  margin-bottom: 20px;
+`;
+
+const SectionTitle = styled.h3`
+  margin: 0 0 20px 0;
+  color: #212121;
   font-size: 18px;
-  margin: 0 0 5px 0;
+  font-weight: 600;
+`;
+
+const EventsList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`;
+
+const EventCard = styled.div`
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+`;
+
+const EventImage = styled.img`
+  width: 120px;
+  height: 100%;
+  object-fit: cover;
+  
+  @media (max-width: 768px) {
+    width: 100%;
+    height: 100px;
+  }
+`;
+
+const EventInfo = styled.div`
+  flex: 1;
+  padding: 12px;
+`;
+
+const EventName = styled.h4`
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  color: ${colors.primary};
 `;
 
 const EventVenue = styled.div`
-  font-size: 16px;
-  font-weight: 500;
-  margin-bottom: 5px;
-`;
-
-const EventAddress = styled.div`
+  margin-bottom: 8px;
   font-size: 14px;
   color: #757575;
-  margin-bottom: 5px;
 `;
 
-const EventDate = styled.div`
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 15px;
-`;
-
-const PerformanceDetails = styled.div`
-  margin-top: 10px;
-  padding: 10px;
-  background-color: #f5f5f5;
-  border-radius: 4px;
-  margin-bottom: 15px;
-`;
-
-const DetailItem = styled.div`
+const EventDetail = styled.div`
   display: flex;
-  margin-bottom: 5px;
-  
-  &:last-child {
-    margin-bottom: 0;
-  }
+  margin-bottom: 4px;
+  font-size: 14px;
 `;
 
-const DetailLabel = styled.span`
+const EventLabel = styled.div`
   font-weight: 600;
-  font-size: 14px;
-  width: 120px;
+  width: 50px;
+  color: #757575;
 `;
 
-const DetailValue = styled.span`
-  font-size: 14px;
+const EventValue = styled.div`
+  flex: 1;
 `;
 
 const EventActions = styled.div`
+  margin-top: 8px;
   display: flex;
-  gap: 10px;
-  margin-top: 15px;
+  justify-content: flex-end;
+  gap: 8px;
 `;
 
-const ActionButton = styled.button`
-  padding: 8px 16px;
-  background-color: ${props => props.primary ? colors.primary || '#FF5722' : 'white'};
-  color: ${props => props.primary ? 'white' : colors.primary || '#FF5722'};
-  border: 1px solid ${colors.primary || '#FF5722'};
+const EventButton = styled.button`
+  padding: 6px 12px;
+  background-color: ${props => props.primary ? colors.primary : 'white'};
+  color: ${props => props.primary ? 'white' : colors.primary};
+  border: 1px solid ${colors.primary};
   border-radius: 4px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
   
   &:hover {
-    background-color: ${props => props.primary ? '#E64A19' : '#FFCCBC'};
+    background-color: ${props => props.primary ? '#E64A19' : '#FBE9E7'};
   }
 `;
 
-const NoEventsMessage = styled.div`
+const EmptyState = styled.div`
   text-align: center;
-  padding: 40px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
+  padding: 30px;
   color: #757575;
+  border: 1px dashed #e0e0e0;
+  border-radius: 8px;
+`;
+
+const EmptyStateAction = styled.button`
+  display: block;
+  margin: 16px auto 0;
+  padding: 8px 16px;
+  background-color: ${colors.primary};
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #E64A19;
+  }
+`;
+
+const ProfileForm = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`;
+
+const FormField = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const FormLabel = styled.label`
+  font-weight: 600;
+  color: #757575;
+`;
+
+const FormTextArea = styled.textarea`
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  min-height: 100px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 14px;
+  
+  &:focus {
+    outline: none;
+    border-color: ${colors.primary};
+  }
+  
+  &:read-only {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+  }
+`;
+
+const FormSelect = styled.select`
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 14px;
+  
+  &:focus {
+    outline: none;
+    border-color: ${colors.primary};
+  }
+  
+  &:read-only {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+  }
+`;
+
+const FormButton = styled.button`
+  padding: 12px;
+  background-color: ${colors.primary};
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #E64A19;
+  }
+  
+  &:disabled {
+    background-color: #BDBDBD;
+    cursor: not-allowed;
+  }
+`;
+
+const FormNote = styled.div`
+  font-size: 12px;
+  color: #757575;
+  font-style: italic;
 `;
 
 export default ProfileScreen;

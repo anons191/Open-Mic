@@ -2,81 +2,38 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { colors } from '../../theme/colors';
 import moment from 'moment';
+import { eventService } from '../../services/api';
 
-// Mock data for events - this would come from an API in a real app
-const mockEvents = [
-  {
-    id: '1',
-    name: 'Comedy Cellar Open Mic',
-    venue: 'Comedy Cellar',
-    address: '117 MacDougal St, New York, NY',
-    date: '2025-03-25T19:30:00',
-    slots: 20,
-    slotsAvailable: 8,
-    cost: 5,
-    image: '/images/venue1.png',
-    rating: 4.8,
-    distance: 0.8
-  },
-  {
-    id: '2',
-    name: 'Laugh Factory Weekly Showcase',
-    venue: 'Laugh Factory',
-    address: '8001 Sunset Blvd, Los Angeles, CA',
-    date: '2025-03-26T20:00:00',
-    slots: 15,
-    slotsAvailable: 3,
-    cost: 10,
-    image: '/images/venue2.png',
-    rating: 4.5,
-    distance: 2.3
-  },
-  {
-    id: '3',
-    name: 'The Stand NYC Newcomers Show',
-    venue: 'The Stand NYC',
-    address: '116 E 16th St, New York, NY',
-    date: '2025-03-28T21:00:00',
-    slots: 18,
-    slotsAvailable: 12,
-    cost: 0,
-    image: '/images/venue3.png',
-    rating: 4.6,
-    distance: 1.5
-  },
-  {
-    id: '4',
-    name: 'Gotham Comedy Workout',
-    venue: 'Gotham Comedy Club',
-    address: '208 W 23rd St, New York, NY',
-    date: '2025-03-29T18:00:00',
-    slots: 25,
-    slotsAvailable: 5,
-    cost: 15,
-    image: '/images/venue1.png',
-    rating: 4.7,
-    distance: 1.2
-  }
-];
-
-const EventListScreen = () => {
+const EventListScreen = ({ userRole = 'guest' }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEvent, setSelectedEvent] = useState(null);
   
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setEvents(mockEvents);
-      setLoading(false);
-    }, 800);
+    // Fetch events from API
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const response = await eventService.getEvents();
+        setEvents(response.data);
+        setLoading(false);
+      } catch (err) {
+        setError(err.message || 'Failed to fetch events');
+        setLoading(false);
+        console.error('Error fetching events:', err);
+      }
+    };
+
+    fetchEvents();
   }, []);
   
   const filteredEvents = events.filter(event => 
     event.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    event.venue.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    event.address.toLowerCase().includes(searchQuery.toLowerCase())
+    (event.venue && event.venue.name && event.venue.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (event.venue && event.venue.address && event.venue.address.city && 
+     event.venue.address.city.toLowerCase().includes(searchQuery.toLowerCase()))
   );
   
   const formatEventTime = (dateTime) => {
@@ -90,11 +47,43 @@ const EventListScreen = () => {
   const closeEventDetail = () => {
     setSelectedEvent(null);
   };
+
+  const handleRegisterAsPerformer = async (eventId) => {
+    try {
+      await eventService.registerAsPerformer(eventId);
+      // Refresh the event data
+      const response = await eventService.getEventById(eventId);
+      setSelectedEvent(response.data);
+    } catch (err) {
+      console.error('Error registering as performer:', err);
+      alert('Failed to register. Please try again.');
+    }
+  };
+
+  const handleRegisterAsAttendee = async (eventId) => {
+    try {
+      await eventService.registerAsAttendee(eventId);
+      // Refresh the event data
+      const response = await eventService.getEventById(eventId);
+      setSelectedEvent(response.data);
+    } catch (err) {
+      console.error('Error registering as attendee:', err);
+      alert('Failed to register. Please try again.');
+    }
+  };
   
   if (loading) {
     return (
       <LoadingContainer>
         <LoadingText>Loading events...</LoadingText>
+      </LoadingContainer>
+    );
+  }
+
+  if (error) {
+    return (
+      <LoadingContainer>
+        <LoadingText>Error: {error}</LoadingText>
       </LoadingContainer>
     );
   }
@@ -105,10 +94,10 @@ const EventListScreen = () => {
         <BackButton onClick={closeEventDetail}>← Back to Events</BackButton>
         
         <EventDetailHeader>
-          <EventDetailImage src={selectedEvent.image} alt={selectedEvent.name} />
+          <EventDetailImage src={selectedEvent.image || '/images/venue1.png'} alt={selectedEvent.name} />
           <EventDetailHeaderOverlay>
             <EventName>{selectedEvent.name}</EventName>
-            <EventVenue>{selectedEvent.venue}</EventVenue>
+            <EventVenue>{selectedEvent.venue?.name}</EventVenue>
             <EventDateTime>{formatEventTime(selectedEvent.date)}</EventDateTime>
           </EventDetailHeaderOverlay>
         </EventDetailHeader>
@@ -116,7 +105,9 @@ const EventListScreen = () => {
         <EventDetailContent>
           <DetailItem>
             <DetailLabel>Address:</DetailLabel>
-            <DetailValue>{selectedEvent.address}</DetailValue>
+            <DetailValue>
+              {selectedEvent.venue?.address?.street}, {selectedEvent.venue?.address?.city}, {selectedEvent.venue?.address?.state}
+            </DetailValue>
           </DetailItem>
           
           <DetailItem>
@@ -126,13 +117,36 @@ const EventListScreen = () => {
           
           <DetailItem>
             <DetailLabel>Available Slots:</DetailLabel>
-            <DetailValue>{selectedEvent.slotsAvailable} of {selectedEvent.slots}</DetailValue>
+            <DetailValue>{selectedEvent.totalSlots - (selectedEvent.performers?.length || 0)} of {selectedEvent.totalSlots}</DetailValue>
+          </DetailItem>
+
+          <DetailItem>
+            <DetailLabel>Description:</DetailLabel>
+            <DetailValue>{selectedEvent.description}</DetailValue>
           </DetailItem>
           
           <ActionButtons>
-            <PrimaryButton>Sign Up to Perform</PrimaryButton>
-            <SecondaryButton>Attend as Guest</SecondaryButton>
+            {userRole === 'comedian' && (
+              <PrimaryButton onClick={() => handleRegisterAsPerformer(selectedEvent._id)}>
+                Sign Up to Perform
+              </PrimaryButton>
+            )}
+            <SecondaryButton onClick={() => handleRegisterAsAttendee(selectedEvent._id)}>
+              {userRole === 'comedian' ? 'Attend as Guest' : 'Attend Event'}
+            </SecondaryButton>
           </ActionButtons>
+
+          {userRole === 'venue_owner' && selectedEvent.performers && selectedEvent.performers.length > 0 && (
+            <PerformersList>
+              <PerformersTitle>Registered Performers</PerformersTitle>
+              {selectedEvent.performers.map((performer, index) => (
+                <PerformerItem key={performer._id || index}>
+                  <PerformerName>{performer.user?.name || 'Unnamed Comedian'}</PerformerName>
+                  <PerformerSlot>Slot #{performer.slotNumber}</PerformerSlot>
+                </PerformerItem>
+              ))}
+            </PerformersList>
+          )}
         </EventDetailContent>
       </EventDetailContainer>
     );
@@ -152,9 +166,9 @@ const EventListScreen = () => {
       
       <EventsContainer>
         {filteredEvents.map(event => (
-          <EventCard key={event.id} onClick={() => handleViewEvent(event)}>
+          <EventCard key={event._id} onClick={() => handleViewEvent(event)}>
             <EventImageContainer>
-              <EventImage src={event.image} alt={event.venue} />
+              <EventImage src={event.image || '/images/venue1.png'} alt={event.venue?.name} />
               <EventCost>{event.cost === 0 ? 'FREE' : `$${event.cost}`}</EventCost>
             </EventImageContainer>
             
@@ -162,12 +176,19 @@ const EventListScreen = () => {
               <EventDateTime>{formatEventTime(event.date)}</EventDateTime>
               <EventTitle>{event.name}</EventTitle>
               <EventVenueAddress>
-                {event.venue} • {event.address.split(',')[0]}
+                {event.venue?.name} • {event.venue?.address?.city}
               </EventVenueAddress>
               
               <EventStats>
-                <EventRating>★ {event.rating.toFixed(1)}</EventRating>
-                <EventSlots>{event.slotsAvailable} slots available</EventSlots>
+                {userRole === 'comedian' ? (
+                  <EventSlots>
+                    {event.totalSlots - (event.performers?.length || 0)} slots available
+                  </EventSlots>
+                ) : (
+                  <EventAttendees>
+                    {event.attendees?.length || 0} attending
+                  </EventAttendees>
+                )}
               </EventStats>
             </EventInfo>
           </EventCard>
@@ -294,15 +315,14 @@ const EventStats = styled.div`
   margin-top: auto;
 `;
 
-const EventRating = styled.div`
-  color: #FFC107;
-  font-size: 14px;
-  font-weight: 500;
-`;
-
 const EventSlots = styled.div`
   font-size: 14px;
   color: #4CAF50;
+`;
+
+const EventAttendees = styled.div`
+  font-size: 14px;
+  color: #757575;
 `;
 
 const MapViewButton = styled.button`
@@ -455,6 +475,42 @@ const SecondaryButton = styled.button`
   &:hover {
     background-color: #FBE9E7;
   }
+`;
+
+const PerformersList = styled.div`
+  margin-top: 30px;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 20px;
+`;
+
+const PerformersTitle = styled.h3`
+  margin: 0 0 15px 0;
+  font-size: 18px;
+  color: #424242;
+`;
+
+const PerformerItem = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid #f5f5f5;
+  
+  &:hover {
+    background-color: #f9f9f9;
+  }
+`;
+
+const PerformerName = styled.div`
+  font-weight: 500;
+`;
+
+const PerformerSlot = styled.div`
+  font-size: 14px;
+  color: #757575;
+  background-color: #f5f5f5;
+  padding: 4px 8px;
+  border-radius: 4px;
 `;
 
 export default EventListScreen;
