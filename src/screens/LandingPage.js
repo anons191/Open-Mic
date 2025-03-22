@@ -17,6 +17,7 @@ const LandingPage = ({ onLoginClick }) => {
     try {
       setLoading(true);
       setError(null);
+      console.log('Attempting login with:', { email, password });
       const response = await authService.login(email, password);
       console.log('Login successful', response);
       // Redirect to the main app
@@ -173,19 +174,19 @@ const LandingPage = ({ onLoginClick }) => {
                   <RoleRadioItem>
                     <RoleRadioInput 
                       type="radio" 
-                      id="venue_owner" 
+                      id="host" 
                       name="role" 
-                      value="venue_owner"
-                      checked={role === 'venue_owner'}
-                      onChange={() => setRole('venue_owner')}
+                      value="host"
+                      checked={role === 'host'}
+                      onChange={() => setRole('host')}
                     />
-                    <RoleRadioLabel htmlFor="venue_owner">Venue Owner</RoleRadioLabel>
+                    <RoleRadioLabel htmlFor="host">Host</RoleRadioLabel>
                   </RoleRadioItem>
                 </RoleRadioGroup>
                 <RoleDescription>
                   {role === 'guest' && 'Discover and attend comedy events'}
                   {role === 'comedian' && 'Find open mics and sign up for performance slots'}
-                  {role === 'venue_owner' && 'Manage your venues and create comedy events'}
+                  {role === 'host' && 'Organize and host comedy events at various venues'}
                 </RoleDescription>
               </FormField>
               <FormSubmitButton type="submit" disabled={loading}>

@@ -46,14 +46,7 @@ router.get('/:id', async (req, res) => {
 // @access  Private
 router.post('/', protect, async (req, res) => {
   try {
-    // Check if user is a venue owner
-    if (req.user.role !== 'venue_owner') {
-      return res.status(403).json({ message: 'Only venue owners can create venues' });
-    }
-    
-    // Add owner to req.body
-    req.body.owner = req.user.id;
-    
+    // Any authenticated user can create a venue
     const venue = await Venue.create(req.body);
     
     res.status(201).json({
@@ -68,18 +61,13 @@ router.post('/', protect, async (req, res) => {
 
 // @route   PUT /api/venues/:id
 // @desc    Update venue
-// @access  Private
+// @access  Private (anyone can update venue details)
 router.put('/:id', protect, async (req, res) => {
   try {
     let venue = await Venue.findById(req.params.id);
     
     if (!venue) {
       return res.status(404).json({ message: 'Venue not found' });
-    }
-    
-    // Check if user is venue owner
-    if (venue.owner.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized to update this venue' });
     }
     
     venue = await Venue.findByIdAndUpdate(req.params.id, req.body, {
@@ -99,7 +87,7 @@ router.put('/:id', protect, async (req, res) => {
 
 // @route   DELETE /api/venues/:id
 // @desc    Delete venue
-// @access  Private
+// @access  Private (admin only)
 router.delete('/:id', protect, async (req, res) => {
   try {
     const venue = await Venue.findById(req.params.id);
@@ -108,9 +96,9 @@ router.delete('/:id', protect, async (req, res) => {
       return res.status(404).json({ message: 'Venue not found' });
     }
     
-    // Check if user is venue owner
-    if (venue.owner.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized to delete this venue' });
+    // Check if user is admin (only admins can delete venues)
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to delete venues' });
     }
     
     await venue.remove();

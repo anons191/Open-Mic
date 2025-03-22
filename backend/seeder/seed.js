@@ -49,39 +49,66 @@ const importData = async () => {
 
     console.log('Existing data cleared');
 
-    // Import users with hashed passwords
-    const preparedUsers = await prepareUsers();
-    const createdUsers = await User.insertMany(preparedUsers);
-    console.log(`${createdUsers.length} users created`);
-    
-    // Find user IDs
-    const venueOwner = createdUsers.find(user => user.role === 'venue_owner');
-    
-    // Add owner to venues
-    const venuesWithOwner = venues.map(venue => {
-      return { ...venue, owner: venueOwner._id };
-    });
-    
-    // Import venues
-    const createdVenues = await Venue.insertMany(venuesWithOwner);
-    console.log(`${createdVenues.length} venues created`);
-    
-    // Link events to venues
-    const laughFactory = createdVenues.find(venue => venue.name === 'The Laugh Factory');
-    const chuckleHut = createdVenues.find(venue => venue.name === 'Chuckle Hut');
-    
-    const eventsWithVenues = events.map((event, index) => {
-      if (index === 2) {
-        return { ...event, venue: chuckleHut._id };
+    // Check if there's any data to import
+    if (users.length === 0) {
+      console.log('No user data to import');
+    } else {
+      // Import users with hashed passwords
+      const preparedUsers = await prepareUsers();
+      const createdUsers = await User.insertMany(preparedUsers);
+      console.log(`${createdUsers.length} users created`);
+      
+      // Process venues if we have users and venues
+      if (venues.length > 0 && createdUsers.length > 0) {
+        // Find a host user if there is one
+        const hostUser = createdUsers.find(user => user.role === 'host');
+        
+        // If we found a host user, add venues
+        if (hostUser) {
+          console.log('Host user found:', hostUser._id);
+          
+          // Add host to venues
+          const venuesWithHost = venues.map(venue => {
+            return { ...venue, host: hostUser._id };
+          });
+          
+          // Import venues
+          const createdVenues = await Venue.insertMany(venuesWithHost);
+          console.log(`${createdVenues.length} venues created`);
+          
+          // Process events if we have venues and events
+          if (events.length > 0 && createdVenues.length > 0) {
+            // Map venues by name for easier lookup
+            const venueMap = {};
+            createdVenues.forEach(venue => {
+              venueMap[venue.name] = venue._id;
+            });
+            
+            // Add host to events
+            const eventsWithData = events.map(event => {
+              // Add default venue and host
+              return { 
+                ...event, 
+                venue: venueMap[Object.keys(venueMap)[0]],
+                host: hostUser._id
+              };
+            });
+            
+            // Import events
+            const createdEvents = await Event.insertMany(eventsWithData);
+            console.log(`${createdEvents.length} events created`);
+          } else {
+            console.log('No events to import or no venues available');
+          }
+        } else {
+          console.log('No host user found, skipping venue creation');
+        }
+      } else {
+        console.log('No venues to import or no users available');
       }
-      return { ...event, venue: laughFactory._id };
-    });
+    }
     
-    // Import events
-    const createdEvents = await Event.insertMany(eventsWithVenues);
-    console.log(`${createdEvents.length} events created`);
-    
-    console.log('Data imported successfully!');
+    console.log('Data import process completed!');
     process.exit();
   } catch (err) {
     console.error('Error importing data:', err);

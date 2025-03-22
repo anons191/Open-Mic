@@ -66,11 +66,7 @@ const VenueSchema = new mongoose.Schema({
   capacity: {
     type: Number
   },
-  owner: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
+  // Removed host field - venues exist independently
   createdAt: {
     type: Date,
     default: Date.now

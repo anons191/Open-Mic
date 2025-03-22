@@ -2,51 +2,33 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { colors } from '../../theme/colors';
 import moment from 'moment';
-import { eventService, venueService } from '../../services/api';
+import { eventService } from '../../services/api';
 
 const EventListScreen = ({ userRole = 'guest' }) => {
   const [events, setEvents] = useState([]);
-  const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [selectedVenue, setSelectedVenue] = useState(null);
-  const [showAllVenues, setShowAllVenues] = useState(false);
   
   useEffect(() => {
-    // Fetch events and venues from API
-    const fetchData = async () => {
+    // Fetch events from API
+    const fetchEvents = async () => {
       try {
         setLoading(true);
-        // Fetch events
-        const eventsResponse = await eventService.getEvents();
-        if (eventsResponse && eventsResponse.data) {
-          setEvents(eventsResponse.data);
-        } else {
-          setEvents([]);
-        }
-
-        // Fetch all venues
-        const venuesResponse = await venueService.getVenues();
-        if (venuesResponse && venuesResponse.data) {
-          setVenues(venuesResponse.data);
-        } else {
-          setVenues([]);
-        }
-        
+        const response = await eventService.getEvents();
+        setEvents(response.data);
         setLoading(false);
       } catch (err) {
-        setError(err ? (err.message || 'Failed to fetch data') : 'Unknown error');
+        setError(err.message || 'Failed to fetch events');
         setLoading(false);
-        console.error('Error fetching data:', err);
+        console.error('Error fetching events:', err);
       }
     };
 
-    fetchData();
+    fetchEvents();
   }, []);
   
-  // Filter events based on search query
   const filteredEvents = events.filter(event => 
     event.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (event.venue && event.venue.name && event.venue.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -54,34 +36,16 @@ const EventListScreen = ({ userRole = 'guest' }) => {
      event.venue.address.city.toLowerCase().includes(searchQuery.toLowerCase()))
   );
   
-  // Filter venues based on search query
-  const filteredVenues = venues.filter(venue => 
-    venue.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (venue.address && venue.address.city && venue.address.city.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
-  // Helper functions
   const formatEventTime = (dateTime) => {
     return moment(dateTime).format('ddd, MMM D • h:mm A');
   };
   
   const handleViewEvent = (event) => {
     setSelectedEvent(event);
-    setSelectedVenue(null);
-  };
-
-  const handleViewVenue = (venue) => {
-    setSelectedVenue(venue);
-    setSelectedEvent(null);
   };
   
-  const closeDetail = () => {
+  const closeEventDetail = () => {
     setSelectedEvent(null);
-    setSelectedVenue(null);
-  };
-  
-  const toggleVenueView = () => {
-    setShowAllVenues(!showAllVenues);
   };
 
   const handleRegisterAsPerformer = async (eventId) => {
@@ -127,7 +91,7 @@ const EventListScreen = ({ userRole = 'guest' }) => {
   if (selectedEvent) {
     return (
       <EventDetailContainer>
-        <BackButton onClick={closeDetail}>← Back to Events</BackButton>
+        <BackButton onClick={closeEventDetail}>← Back to Events</BackButton>
         
         <EventDetailHeader>
           <EventDetailImage src={selectedEvent.image || '/images/venue1.png'} alt={selectedEvent.name} />
@@ -144,11 +108,6 @@ const EventListScreen = ({ userRole = 'guest' }) => {
             <DetailValue>
               {selectedEvent.venue?.address?.street}, {selectedEvent.venue?.address?.city}, {selectedEvent.venue?.address?.state}
             </DetailValue>
-          </DetailItem>
-          
-          <DetailItem>
-            <DetailLabel>Host:</DetailLabel>
-            <DetailValue>{selectedEvent.host?.name || 'Unknown Host'}</DetailValue>
           </DetailItem>
           
           <DetailItem>
@@ -190,7 +149,7 @@ const EventListScreen = ({ userRole = 'guest' }) => {
             </SecondaryButton>
           </ActionButtons>
 
-          {userRole === 'host' && selectedEvent.performers && selectedEvent.performers.length > 0 && (
+          {userRole === 'venue_owner' && selectedEvent.performers && selectedEvent.performers.length > 0 && (
             <PerformersList>
               <PerformersTitle>Registered Performers</PerformersTitle>
               {selectedEvent.performers.map((performer, index) => (
@@ -206,67 +165,6 @@ const EventListScreen = ({ userRole = 'guest' }) => {
     );
   }
   
-  if (selectedVenue) {
-    return (
-      <EventDetailContainer>
-        <BackButton onClick={closeDetail}>← Back to Events</BackButton>
-        
-        <EventDetailHeader>
-          <EventDetailImage src={selectedVenue.image || '/images/venue1.png'} alt={selectedVenue.name} />
-          <EventDetailHeaderOverlay>
-            <EventName>{selectedVenue.name}</EventName>
-            <EventVenue>{selectedVenue.address?.city}, {selectedVenue.address?.state}</EventVenue>
-          </EventDetailHeaderOverlay>
-        </EventDetailHeader>
-        
-        <EventDetailContent>
-          <DetailItem>
-            <DetailLabel>Address:</DetailLabel>
-            <DetailValue>
-              {selectedVenue.address?.street}, {selectedVenue.address?.city}, {selectedVenue.address?.state}
-            </DetailValue>
-          </DetailItem>
-          
-          <DetailItem>
-            <DetailLabel>Show:</DetailLabel>
-            <DetailValue>{selectedVenue.showTitle || 'N/A'}</DetailValue>
-          </DetailItem>
-          
-          <DetailItem>
-            <DetailLabel>Hours:</DetailLabel>
-            <DetailValue>{selectedVenue.operatingHours || 'N/A'}</DetailValue>
-          </DetailItem>
-          
-          <DetailItem>
-            <DetailLabel>Pricing:</DetailLabel>
-            <DetailValue>
-              {selectedVenue.price === 0 ? 'Free entry' : `$${selectedVenue.price} entry`}
-              {selectedVenue.drinkMinimum > 0 ? `, $${selectedVenue.drinkMinimum} drink minimum` : ''}
-            </DetailValue>
-          </DetailItem>
-          
-          <DetailItem>
-            <DetailLabel>Capacity:</DetailLabel>
-            <DetailValue>{selectedVenue.capacity} people</DetailValue>
-          </DetailItem>
-
-          <DetailItem>
-            <DetailLabel>Description:</DetailLabel>
-            <DetailValue>{selectedVenue.description}</DetailValue>
-          </DetailItem>
-          
-          {userRole === 'host' && (
-            <ActionButtons>
-              <PrimaryButton>
-                Create Event at This Venue
-              </PrimaryButton>
-            </ActionButtons>
-          )}
-        </EventDetailContent>
-      </EventDetailContainer>
-    );
-  }
-
   return (
     <Container>
       <SearchContainer>
@@ -277,42 +175,6 @@ const EventListScreen = ({ userRole = 'guest' }) => {
         />
       </SearchContainer>
       
-      <VenueToggle onClick={toggleVenueView}>
-        {showAllVenues ? 'Hide All Venues' : 'Show All Venues'}
-      </VenueToggle>
-      
-      {showAllVenues && (
-        <>
-          <SectionTitle>All Comedy Venues</SectionTitle>
-          <VenuesContainer>
-            {filteredVenues.map(venue => (
-              <VenueCard key={venue._id} onClick={() => handleViewVenue(venue)}>
-                <VenueImageContainer>
-                  <VenueImage src={venue.image || '/images/venue1.png'} alt={venue.name} />
-                </VenueImageContainer>
-                
-                <VenueInfo>
-                  <VenueTitle>{venue.name}</VenueTitle>
-                  <VenueAddress>
-                    {venue.address?.city}, {venue.address?.state}
-                  </VenueAddress>
-                  
-                  <VenuePricing>
-                    {venue.price === 0 ? 'Free entry' : `$${venue.price} entry`}
-                    {venue.drinkMinimum > 0 ? `, $${venue.drinkMinimum} drink minimum` : ''}
-                  </VenuePricing>
-                  
-                  <VenueCapacity>
-                    Capacity: {venue.capacity} people
-                  </VenueCapacity>
-                </VenueInfo>
-              </VenueCard>
-            ))}
-          </VenuesContainer>
-        </>
-      )}
-      
-      <SectionTitle>Upcoming Events</SectionTitle>
       <ResultsCount>{filteredEvents.length} events found</ResultsCount>
       
       <EventsContainer>
@@ -331,13 +193,9 @@ const EventListScreen = ({ userRole = 'guest' }) => {
                 {event.venue?.showTitle ? ` • ${event.venue.showTitle}` : ''}
               </EventVenueAddress>
               
-              <EventHost>
-                Hosted by: {event.host?.name || 'Unknown Host'}
-              </EventHost>
-              
               <EventPricing>
-                {event.cost === 0 ? 'Free entry' : `${event.cost} entry`}
-                {event.venue?.drinkMinimum > 0 ? `, ${event.venue.drinkMinimum} drink minimum` : ''}
+                {event.cost === 0 ? 'Free entry' : `$${event.cost} entry`}
+                {event.venue?.drinkMinimum > 0 ? `, $${event.venue.drinkMinimum} drink minimum` : ''}
               </EventPricing>
               
               <EventStats>
@@ -679,109 +537,5 @@ const PerformerSlot = styled.div`
   padding: 4px 8px;
   border-radius: 4px;
 `;
-
-// Venue Styled Components
-const VenueToggle = styled.button`
-  padding: 8px 16px;
-  background-color: transparent;
-  border: 1px solid ${colors.primary};
-  color: ${colors.primary};
-  border-radius: 4px;
-  font-weight: 500;
-  cursor: pointer;
-  margin-bottom: 20px;
-  transition: background-color 0.2s;
-  
-  &:hover {
-    background-color: #FBE9E7;
-  }
-`;
-
-const SectionTitle = styled.h2`
-  font-size: 20px;
-  margin: 25px 0 15px 0;
-  color: #212121;
-`;
-
-const VenuesContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  margin-bottom: 30px;
-`;
-
-const VenueCard = styled.div`
-  display: flex;
-  background-color: white;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  transition: transform 0.2s;
-  
-  &:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  }
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-  }
-`;
-
-const VenueImageContainer = styled.div`
-  position: relative;
-  width: 200px;
-  height: 160px;
-  
-  @media (max-width: 768px) {
-    width: 100%;
-  }
-`;
-
-const VenueImage = styled.img`
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-`;
-
-const VenueInfo = styled.div`
-  flex: 1;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-`;
-
-const VenueTitle = styled.h3`
-  margin: 0 0 5px 0;
-  font-size: 18px;
-`;
-
-const VenueAddress = styled.div`
-  font-size: 14px;
-  color: #757575;
-  margin-bottom: 10px;
-`;
-
-const VenuePricing = styled.div`
-  font-size: 14px;
-  color: #757575;
-  margin-bottom: 10px;
-`;
-
-const VenueCapacity = styled.div`
-  font-size: 14px;
-  color: #757575;
-  margin-top: auto;
-`;
-
-const EventHost = styled.div`
-  font-size: 14px;
-  color: #555555;
-  margin-bottom: 10px;
-  font-style: italic;
-`;
-
-// EventDateTime is already defined above, removing duplicate declaration
 
 export default EventListScreen;

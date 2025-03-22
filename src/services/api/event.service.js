@@ -20,7 +20,7 @@ export const getEventById = async (id) => {
   }
 };
 
-// Create new event (venue owners only)
+// Create new event (host only)
 export const createEvent = async (eventData) => {
   try {
     const response = await api.post('/events', eventData);
@@ -30,7 +30,7 @@ export const createEvent = async (eventData) => {
   }
 };
 
-// Update event (venue owners only)
+// Update event (hosts can only update their own events)
 export const updateEvent = async (id, eventData) => {
   try {
     const response = await api.put(`/events/${id}`, eventData);

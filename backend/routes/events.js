@@ -10,11 +10,18 @@ const { protect } = require('../config/auth');
 router.get('/', async (req, res) => {
   try {
     // Build query
-    let query = Event.find().populate('venue', 'name address');
+    let query = Event.find()
+      .populate('venue', 'name address showTitle')
+      .populate('host', 'name');
     
     // Filter by date (future events by default)
     if (!req.query.showPast) {
       query = query.where('date').gte(new Date());
+    }
+    
+    // Filter by host
+    if (req.query.host) {
+      query = query.where('host').equals(req.query.host);
     }
     
     // Filter by venue
@@ -49,7 +56,8 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const event = await Event.findById(req.params.id)
-      .populate('venue', 'name address description')
+      .populate('venue', 'name address description showTitle operatingHours drinkMinimum')
+      .populate('host', 'name bio photo')
       .populate('performers.user', 'name bio photo')
       .populate('attendees', 'name');
     
@@ -69,20 +77,23 @@ router.get('/:id', async (req, res) => {
 
 // @route   POST /api/events
 // @desc    Create new event
-// @access  Private
+// @access  Private (host only)
 router.post('/', protect, async (req, res) => {
   try {
-    // Verify venue exists and belongs to user
+    // Verify venue exists
     const venue = await Venue.findById(req.body.venue);
     
     if (!venue) {
       return res.status(404).json({ message: 'Venue not found' });
     }
     
-    // Check if user owns the venue
-    if (venue.owner.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to create events at this venue' });
+    // Check if user is a host
+    if (req.user.role !== 'host') {
+      return res.status(403).json({ message: 'Only hosts can create events' });
     }
+    
+    // Add host to the event data
+    req.body.host = req.user.id;
     
     const event = await Event.create(req.body);
     
@@ -98,7 +109,7 @@ router.post('/', protect, async (req, res) => {
 
 // @route   PUT /api/events/:id
 // @desc    Update event
-// @access  Private
+// @access  Private (hosts can only update their own events)
 router.put('/:id', protect, async (req, res) => {
   try {
     let event = await Event.findById(req.params.id);
@@ -107,11 +118,14 @@ router.put('/:id', protect, async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
     
-    // Check if user owns the venue of this event
-    const venue = await Venue.findById(event.venue);
-    
-    if (venue.owner.toString() !== req.user.id) {
+    // Check if user is the host of this event
+    if (req.user.role !== 'host' || event.host.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Not authorized to update this event' });
+    }
+    
+    // Don't allow changing the host
+    if (req.body.host && req.body.host !== req.user.id) {
+      delete req.body.host; // Remove host field if it's being changed
     }
     
     event = await Event.findByIdAndUpdate(req.params.id, req.body, {

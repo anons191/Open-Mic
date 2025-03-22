@@ -15,6 +15,11 @@ const EventSchema = new mongoose.Schema({
     ref: 'Venue',
     required: true
   },
+  host: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
   date: {
     type: Date,
     required: [true, 'Please add an event date']

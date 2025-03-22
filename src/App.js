@@ -5,7 +5,7 @@ import AuthNavigator from './navigation/AuthNavigator';
 import ProfileScreen from './screens/profile/ProfileScreen';
 import MapScreen from './screens/events/MapScreen';
 import EventListScreen from './screens/events/EventListScreen';
-import VenueManagementScreen from './screens/venues/VenueManagementScreen';
+import EventCreationScreen from './screens/events/EventCreationScreen';
 import styled from 'styled-components';
 import { authService } from './services/api';
 
@@ -29,7 +29,7 @@ function App() {
             setUser(currentUser);
             
             // Set initial active tab based on user role
-            if (currentUser.role === 'venue_owner') {
+            if (currentUser.role === 'host') {
               setActiveTab('venues');
             } else {
               setActiveTab('events');
@@ -60,7 +60,7 @@ function App() {
     setUser(userData);
     
     // Set initial active tab based on user role
-    if (userData.role === 'venue_owner') {
+    if (userData.role === 'host') {
       setActiveTab('venues');
     } else {
       setActiveTab('events');
@@ -84,7 +84,7 @@ function App() {
       case 'map':
         return <MapScreen userRole={user?.role} />;
       case 'venues':
-        return <VenueManagementScreen user={user} />;
+        return <EventCreationScreen user={user} />;
       default:
         return <ProfileScreen user={user} />;
     }
@@ -124,17 +124,17 @@ function App() {
                 >
                   Map
                 </NavItem>
-                {user?.role === 'venue_owner' && (
+                {user?.role === 'host' && (
                   <NavItem 
                     active={activeTab === 'venues'} 
                     onClick={() => setActiveTab('venues')}
                   >
-                    My Venues
+                    Create Event
                   </NavItem>
                 )}
               </HeaderNav>
               <UserInfo>
-                <UserRole>{user?.role === 'venue_owner' ? 'Venue Owner' : user?.role === 'comedian' ? 'Comedian' : 'Guest'}</UserRole>
+                <UserRole>{user?.role === 'host' ? 'Host' : user?.role === 'comedian' ? 'Comedian' : 'Guest'}</UserRole>
                 <LogoutButton onClick={handleLogout}>
                   Log Out
                 </LogoutButton>
